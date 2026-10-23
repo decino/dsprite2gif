@@ -19,12 +19,23 @@ import re
 
 from omg.wad import WAD
 
+def load_wad(wad_path):
+    if not os.path.exists(wad_path):
+        raise FileNotFoundError(f"Could not find WAD at: { wad_path }")
+
+    # Check file header just to be sure
+    with open(wad_path, 'rb') as f:
+        if f.read(4) not in (b'IWAD', b'PWAD'):
+            raise ValueError(f"Not a valid WAD file: { wad_path }")
+
+    return WAD(wad_path)
+
 def load_wads(iwad_path, pwad_paths):
-    wads = WAD(iwad_path)
+    wads = load_wad(iwad_path)
 
     # Epic overrides, thank you omg
     for pwad_path in pwad_paths:
-        pwad = WAD(pwad_path)
+        pwad = load_wad(pwad_path)
         wads = wads + pwad
     return wads
 
@@ -138,6 +149,9 @@ def parse_info_c(info_c_path):
                 'raisestate': raise_label,
             }
         })
+
+    if not states or not mobjinfo_list:
+        raise ValueError(f"No states or things found in { info_c_path }")
 
     return sprite_names, states, state_name_to_index, state_index_to_name, mobjinfo_list
 
