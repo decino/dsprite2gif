@@ -21,7 +21,7 @@ import argparse
 from doomdata import load_wads, parse_info_c
 from render import generate_animations
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description = "Generate Doom sprites into tic-accurate GIF animations")
