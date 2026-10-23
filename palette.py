@@ -42,7 +42,7 @@ def load_colormap(wad):
 
     # Only the light levels up to the fuzz one are needed
     if len(raw_bytes) < (FUZZ_COLORMAP + 1) * 256:
-        raise ValueError(f"COLORMAP lump is too small ({len(raw_bytes)} bytes, expected at least { (FUZZ_COLORMAP + 1) * 256 }).")
+        raise ValueError(f"COLORMAP lump is too small ({ len(raw_bytes) } bytes, expected at least { (FUZZ_COLORMAP + 1) * 256 }).")
 
     return raw_bytes
 
