@@ -58,6 +58,6 @@ py dsprite2gif.py doom2.wad D2SPFX20.WAD
 
 ## License
 
-dsprite2gif is licensed under the GNU GPLv3 or later, see [LICENSE](LICENSE).
+dsprite2gif is licensed under the GNU GPLv2 or later. See [LICENSE](LICENSE).
 
 The fuzz table and `info.c` are taken from Doom's source code by id Software. Both are licensed under the GNU GPLv2, see id Software's [Doom repository](https://github.com/id-Software/DOOM).

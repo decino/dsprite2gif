@@ -1,9 +1,9 @@
 # dsprite2gif - Extracts Doom sprites from WADs into tic-accurate GIF animations
 # Copyright (C) 2026 decino
 #
-# This program is free software: you can redistribute it and/or modify
+# This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
+# the Free Software Foundation; either version 2 of the License, or
 # (at your option) any later version.
 #
 # This program is distributed in the hope that it will be useful,
@@ -13,10 +13,6 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
-import random
-
-from PIL import Image
 
 def load_playpal(wad):
     if 'PLAYPAL' not in wad.data:
