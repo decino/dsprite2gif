@@ -225,6 +225,14 @@ def generate_animations(wad, states, state_name_to_index, mobjinfo_list, scale_f
                         gif_frame = frame.convert('RGB').convert('P', palette = Image.Palette.ADAPTIVE, colors = 255)
                         trans_mask = frame.getchannel('A').point(transparency_lut) # Apply mask for palette index 255
                         gif_frame.paste(255, mask = trans_mask)
+
+                        # Pillow dropped black pixels on some sprites, so store them properly
+                        palette = gif_frame.getpalette()[:765]
+                        palette += [0] * (765 - len(palette))
+                        used = { tuple(palette[i:i + 3]) for i in range(0, 765, 3) }
+                        palette += next(c for c in ((255, 0, 255), (0, 255, 255), (255, 255, 0), (1, 2, 3)) if c not in used)
+                        gif_frame.putpalette(palette)
+
                         paletted_frames.append(gif_frame)
 
                     paletted_frames[0].save(
