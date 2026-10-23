@@ -21,7 +21,7 @@ from PIL import Image
 
 from lut import get_mobj_info
 from palette import load_playpal, load_colormap, translate_player_color, apply_fuzz
-from doomdata import trace_state_sequence, build_sprite_frame_table
+from doomdata import trace_state_sequence, get_looped_sequence, ends_with_refire, build_sprite_frame_table
 
 def generate_animations(wad, states, state_name_to_index, mobjinfo_list, scale_factor = 1.0, use_aspect_ratio = True, all_fuzz = False, output_base = "animations"):
     transparent_colour = (0, 0, 0, 0)
@@ -72,6 +72,13 @@ def generate_animations(wad, states, state_name_to_index, mobjinfo_list, scale_f
             
             entity_sequences = {}
             all_entity_frames = []
+
+            # States the thing idles or walks in, other animations end by returning to these
+            idle_state_indices = {}
+
+            for idle_key in ('spawnstate', 'seestate'):
+                idle_sequence = trace_state_sequence(mobj['states'][idle_key], states, state_name_to_index)
+                idle_state_indices[idle_key] = { state['state_index'] for state in idle_sequence }
             
             for state_key, start_label in mobj['states'].items():
                 sequence = trace_state_sequence(start_label, states, state_name_to_index)
@@ -86,98 +93,119 @@ def generate_animations(wad, states, state_name_to_index, mobjinfo_list, scale_f
                         if state['tics'] > 0:
                             state['tics'] = max(1, state['tics'] >> 1)
                 
-                sprite_prefix = sequence[0]['sprite']
-                sprite_temp = build_sprite_frame_table(wad, sprite_prefix)
-                needs_rotation = False
-                
-                for state in sequence:
-                    frame_index = state['frame_index']
+                # Some animations loop back past their first state(s), e.g. refiring attacks, so also render that loop on its own
+                other_idle_indices = set().union(*(indices for key, indices in idle_state_indices.items() if key != state_key))
+                looped_sequence = get_looped_sequence(sequence, states, state_name_to_index, other_idle_indices)
 
-                    if frame_index in sprite_temp and sprite_temp[frame_index]['rotate'] == True:
-                        needs_rotation = True
-                        break
-
-                # Sprite has 8 rotations, or is a billboard
-                available_rots = range(1, 9) if needs_rotation else [1]
-
-                for rotation in available_rots:
-                    raw_frames = []
-                    rotation_lookup = 0 if not needs_rotation else rotation - 1
+                # Attacks that loop on their own end when the refire check finds no target
+                # Charging Lost Souls slamming into something also set the state to spawnstate
+                # To keep things simple, let's just assume all sectors have a soundtarget and the spawnstate becomes a seestate
+                if state_key == 'missilestate' and looped_sequence:
                     
+                    # The refire state itself isn't shown because of the jump to seestate
+                    if ends_with_refire(sequence, states):
+                        sequence = sequence[:-1]
+
+                    sequence = sequence + trace_state_sequence(mobj['states']['seestate'], states, state_name_to_index)
+
+                sequences = [(state_key, sequence)]
+
+                if looped_sequence:
+                    sequences.append((f"{ state_key }_looped", looped_sequence))
+
+                for sequence_key, sequence in sequences:
+                    sprite_prefix = sequence[0]['sprite']
+                    sprite_temp = build_sprite_frame_table(wad, sprite_prefix)
+                    needs_rotation = False
+                
                     for state in sequence:
                         frame_index = state['frame_index']
-                        lump_object = None
-                        is_flipped = False
+
+                        if frame_index in sprite_temp and sprite_temp[frame_index]['rotate'] == True:
+                            needs_rotation = True
+                            break
+
+                    # Sprite has 8 rotations, or is a billboard
+                    available_rots = range(1, 9) if needs_rotation else [1]
+
+                    for rotation in available_rots:
+                        raw_frames = []
+                        rotation_lookup = 0 if not needs_rotation else rotation - 1
+                    
+                        for state in sequence:
+                            frame_index = state['frame_index']
+                            lump_object = None
+                            is_flipped = False
                         
-                        if frame_index in sprite_temp:
-                            if needs_rotation:
-                                if sprite_temp[frame_index]['lump'][rotation_lookup] != -1:
-                                    lump_object = sprite_temp[frame_index]['lump'][rotation_lookup]
-                                    is_flipped = sprite_temp[frame_index]['flip'][rotation_lookup]
-                            else:
-                                for rotation_alt in range(8):
-                                    if sprite_temp[frame_index]['lump'][rotation_alt] != -1:
-                                        lump_object = sprite_temp[frame_index]['lump'][rotation_alt]
-                                        is_flipped = sprite_temp[frame_index]['flip'][rotation_alt]
-                                        break
+                            if frame_index in sprite_temp:
+                                if needs_rotation:
+                                    if sprite_temp[frame_index]['lump'][rotation_lookup] != -1:
+                                        lump_object = sprite_temp[frame_index]['lump'][rotation_lookup]
+                                        is_flipped = sprite_temp[frame_index]['flip'][rotation_lookup]
+                                else:
+                                    for rotation_alt in range(8):
+                                        if sprite_temp[frame_index]['lump'][rotation_alt] != -1:
+                                            lump_object = sprite_temp[frame_index]['lump'][rotation_alt]
+                                            is_flipped = sprite_temp[frame_index]['flip'][rotation_alt]
+                                            break
                                         
-                        if isinstance(lump_object, Graphic):
-                            img = image_cache.get(id(lump_object))
+                            if isinstance(lump_object, Graphic):
+                                img = image_cache.get(id(lump_object))
 
-                            if img is None:
-                                img = image_cache[id(lump_object)] = lump_object.to_Image(mode = 'RGBA')
+                                if img is None:
+                                    img = image_cache[id(lump_object)] = lump_object.to_Image(mode = 'RGBA')
                             
-                            if is_player:
-                                img = translate_player_color(img, readable_folder_name, playpal)
+                                if is_player:
+                                    img = translate_player_color(img, readable_folder_name, playpal)
 
-                            if is_flipped:
-                                img = img.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+                                if is_flipped:
+                                    img = img.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
                                 
-                            tics = state['tics']
+                                tics = state['tics']
 
-                            # Infinite states last 2 seconds
-                            if tics == -1:
-                                tics = 70
+                                # Infinite states last 2 seconds
+                                if tics == -1:
+                                    tics = 70
 
-                            # This kind of sucks, but 0-ms GIF frames vary by platform
-                            # Some browsers turn 0 ms frames into 100 ms frames, some retain the 0 ms duration
-                            # Same applies to image viewers, better safe than sorry
-                            elif tics == 0:
-                                tics = 1
+                                # This kind of sucks, but 0-ms GIF frames vary by platform
+                                # Some browsers turn 0 ms frames into 100 ms frames, some retain the 0 ms duration
+                                # Same applies to image viewers, better safe than sorry
+                                elif tics == 0:
+                                    tics = 1
 
-                            if is_fuzzed_entity:
-                                # Force single-frame sprites to have 10 frames to ensure the fuzz
-                                effective_tics = max(tics, 10) if tics == 1 else tics
+                                if is_fuzzed_entity:
+                                    # Force single-frame sprites to have 10 frames to ensure the fuzz
+                                    effective_tics = max(tics, 10) if tics == 1 else tics
                                 
-                                for _ in range(effective_tics):
-                                    fuzzed_img = apply_fuzz(img, playpal, colormap)
+                                    for _ in range(effective_tics):
+                                        fuzzed_img = apply_fuzz(img, playpal, colormap)
+                                        frame_data = {
+                                            'img': fuzzed_img,
+                                            'width': lump_object.width,
+                                            'height': lump_object.height,
+                                            'x_offset': lump_object.x_offset,
+                                            'y_offset': lump_object.y_offset,
+                                            'duration_ms': tic_duration_in_ms
+                                        }
+                                        raw_frames.append(frame_data)
+                                        all_entity_frames.append(frame_data)
+                                else:
                                     frame_data = {
-                                        'img': fuzzed_img,
+                                        'img': img,
                                         'width': lump_object.width,
                                         'height': lump_object.height,
                                         'x_offset': lump_object.x_offset,
                                         'y_offset': lump_object.y_offset,
-                                        'duration_ms': tic_duration_in_ms
+                                        'duration_ms': tics * tic_duration_in_ms
                                     }
                                     raw_frames.append(frame_data)
                                     all_entity_frames.append(frame_data)
-                            else:
-                                frame_data = {
-                                    'img': img,
-                                    'width': lump_object.width,
-                                    'height': lump_object.height,
-                                    'x_offset': lump_object.x_offset,
-                                    'y_offset': lump_object.y_offset,
-                                    'duration_ms': tics * tic_duration_in_ms
-                                }
-                                raw_frames.append(frame_data)
-                                all_entity_frames.append(frame_data)
                                 
-                    if raw_frames:
-                        if state_key not in entity_sequences:
-                            entity_sequences[state_key] = {}
+                        if raw_frames:
+                            if sequence_key not in entity_sequences:
+                                entity_sequences[sequence_key] = {}
 
-                        entity_sequences[state_key][rotation] = raw_frames
+                            entity_sequences[sequence_key][rotation] = raw_frames
 
             if not all_entity_frames:
                 continue

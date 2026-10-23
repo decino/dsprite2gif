@@ -56,10 +56,10 @@ def parse_info_c(info_c_path):
     # 2. Find SPR_ suffix
     # 3. Frame num
     # 4. Frame duration in tics
-    # 5. Action pointer (skipped)
+    # 5. Action pointer
     # 6. Next state
     state_pattern = re.compile(
-        r'\{\s*SPR_([A-Z0-9]+)\s*,\s*([^,]+)\s*,\s*(-?\d+)\s*,\s*\{[^}]*\}\s*,\s*([A-Z0-9_]+)',
+        r'\{\s*SPR_([A-Z0-9]+)\s*,\s*([^,]+)\s*,\s*(-?\d+)\s*,\s*\{\s*([^}]*?)\s*\}\s*,\s*([A-Z0-9_]+)',
         re.IGNORECASE
     )
     states = []
@@ -68,7 +68,8 @@ def parse_info_c(info_c_path):
         spr_suffix = match.group(1).upper()
         frame_raw = match.group(2).strip()
         tics = int(match.group(3))
-        next_state_label = match.group(4).strip()
+        action = match.group(4)
+        next_state_label = match.group(5).strip()
         
         try:
             frame_val = int(frame_raw, 0)
@@ -79,6 +80,7 @@ def parse_info_c(info_c_path):
             'sprite': spr_suffix,
             'frame_raw': frame_val,
             'tics': tics,
+            'action': action,
             'next_state': next_state_label
         })
 
@@ -174,7 +176,8 @@ def trace_state_sequence(start_label, states, state_name_to_index):
         sequence.append({
             'sprite': st['sprite'],
             'frame_index': frame_index,
-            'tics': st['tics']
+            'tics': st['tics'],
+            'state_index': current_index
         })        
         next_label = st['next_state']
 
@@ -191,6 +194,28 @@ def trace_state_sequence(start_label, states, state_name_to_index):
         current_index = next_index
             
     return sequence
+
+# Attacks that keep firing until the target is lost, then switch to the seestate
+# For the animations we always assume the target is out of sight during the refire check
+REFIRE_ACTIONS = ('A_CPosRefire', 'A_SpidRefire')
+
+def ends_with_refire(sequence, states):
+    return states[sequence[-1]['state_index']]['action'] in REFIRE_ACTIONS
+
+def get_looped_sequence(sequence, states, state_name_to_index, excluded_indices):
+    loop_index = state_name_to_index.get(states[sequence[-1]['state_index']]['next_state'])
+
+    # Animations that end by returning to e.g. walking don't loop on their own
+    if loop_index in excluded_indices:
+        return []
+
+    # Only the part that loops, which skips the initial state(s) such as A_FaceTarget
+    # A loop of a single state is just a still image, so leave those out
+    for position, state in enumerate(sequence):
+        if state['state_index'] == loop_index:
+            return sequence[position:] if 0 < position < len(sequence) - 1 else []
+
+    return []
 
 def build_sprite_frame_table(wad, sprite_prefix):
     sprites_section = getattr(wad, 'sprites', {})
