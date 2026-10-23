@@ -81,4 +81,4 @@ dsprite2gif is licensed under the GNU GPLv2 or later. See [LICENSE](LICENSE).
 
 The fuzz table and `info.c` are taken from Doom's source code by id Software. Both are licensed under the GNU GPLv2, see id Software's [Doom repository](https://github.com/id-Software/DOOM).
 
-The sprites in the example GIFs are © id Software.
+The README's animated sprites are © id Software.
