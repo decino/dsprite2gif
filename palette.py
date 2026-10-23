@@ -21,7 +21,7 @@ def load_playpal(wad):
     raw_bytes = wad.data['PLAYPAL'].data
 
     if len(raw_bytes) < 768:
-        raise ValueError(f"PLAYPAL lump is too small ({len(raw_bytes)} bytes, expected at least 768).")
+        raise ValueError(f"PLAYPAL lump is too small ({ len(raw_bytes) } bytes, expected at least 768).")
 
     base_palette_bytes = raw_bytes[:768]
     palette = []
@@ -42,7 +42,7 @@ def load_colormap(wad):
 
     # Only the light levels up to the fuzz one are needed
     if len(raw_bytes) < (FUZZ_COLORMAP + 1) * 256:
-        raise ValueError(f"COLORMAP lump is too small ({len(raw_bytes)} bytes, expected at least {(FUZZ_COLORMAP + 1) * 256}).")
+        raise ValueError(f"COLORMAP lump is too small ({len(raw_bytes)} bytes, expected at least { (FUZZ_COLORMAP + 1) * 256 }).")
 
     return raw_bytes
 
@@ -92,7 +92,7 @@ def translate_player_color(img, variant_name, playpal):
                 
     return img
 	
-# Fuzz table from DOOM's r_draw.c, Copyright (C) 1993-1996 Id Software, Inc.
+# Fuzz table from Doom's r_draw.c
 FUZZTABLE = 50
 FUZZOFF = 320
 FUZZOFFSET = [

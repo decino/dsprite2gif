@@ -36,7 +36,6 @@ I'm sure Linux users know how to Python. Either way, use `python3` instead of `p
 
 <p align="center">
   <img src="assets/spectre.gif" alt="Spectre">
-  <img src="assets/blursphere.gif" alt="Partial Invisibility">
 </p>
 
 ## How-to
