@@ -71,7 +71,6 @@ Options go after the WAD names:
 - Add support for weapon sprite animations
 - Add PLAYPAL support for WADs with custom palettes
 - Add proper Doom 64 support
-- Fix states with refire checks (e.g. Chaingunners) as they don't loop seamlessly
 
 <p align="center">
   <img src="assets/cyberdemon.gif" alt="Cyberdemon Glutes">
